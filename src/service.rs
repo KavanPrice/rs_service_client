@@ -2,6 +2,8 @@
 //!
 //! ServiceClient holds the service interfaces, credentials, and service urls.
 
+use std::sync::Arc;
+
 use crate::service::auth::AuthInterface;
 use crate::service::configdb::ConfigDbInterface;
 use crate::service::directory::DirectoryInterface;
@@ -24,7 +26,7 @@ pub mod service_trait;
 pub struct ServiceClient {
     pub auth_interface: AuthInterface,
     pub config_db_interface: ConfigDbInterface,
-    pub directory_interface: DirectoryInterface,
+    pub directory_interface: Arc<DirectoryInterface>,
     pub discovery_interface: DiscoveryInterface,
     pub fetch_interface: FetchInterface,
     pub mqtt_interface: MQTTInterface,
@@ -49,6 +51,8 @@ impl ServiceClient {
         directory_url: &str,
         mqtt_url: Option<&str>,
     ) -> Self {
+        let directory_interface = Arc::new(DirectoryInterface::new());
+
         ServiceClient {
             service_creds: ServiceCreds::from(service_username, service_password),
             root_principle: root_principle.map(String::from),
@@ -60,12 +64,13 @@ impl ServiceClient {
 
             auth_interface: AuthInterface::new(),
             config_db_interface: ConfigDbInterface::new(),
-            directory_interface: DirectoryInterface::new(),
+            directory_interface: Arc::clone(&directory_interface),
             discovery_interface: DiscoveryInterface::from(
                 auth_url.map(String::from),
                 config_db_url.map(String::from),
                 Some(String::from(directory_url)),
                 mqtt_url.map(String::from),
+                Arc::clone(&directory_interface),
             ),
             fetch_interface: FetchInterface::new(),
             mqtt_interface: MQTTInterface::new(),
