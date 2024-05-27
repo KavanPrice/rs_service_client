@@ -37,10 +37,7 @@ impl DiscoveryInterface {
         // vector if it does.
         let insert_maybe_url = |(service_uuid, maybe_service_url): (uuid::Uuid, Option<String>)| {
             if let Some(url) = maybe_service_url {
-                urls_map
-                    .entry(service_uuid)
-                    .or_default()
-                    .push(url);
+                urls_map.entry(service_uuid).or_default().push(url);
             }
         };
 
@@ -75,10 +72,7 @@ impl DiscoveryInterface {
     /// to the url key if the key already exists.
     /// This requires a mutable reference to the DiscoveryInterface.
     pub(crate) fn add_service_url(&mut self, service_uuid: uuid::Uuid, service_url: String) {
-        self.urls
-            .entry(service_uuid)
-            .or_default()
-            .push(service_url);
+        self.urls.entry(service_uuid).or_default().push(service_url);
     }
 
     /// Gets all known URLS that point to a service with the given UUID.
