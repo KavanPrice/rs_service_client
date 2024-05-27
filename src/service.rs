@@ -1,3 +1,7 @@
+//! This module provides the entry point for interacting with the Factory+ services.
+//!
+//! ServiceClient holds the service interfaces, credentials, and service urls.
+
 use crate::service::auth::AuthInterface;
 use crate::service::configdb::ConfigDbInterface;
 use crate::service::directory::DirectoryInterface;
@@ -16,6 +20,7 @@ pub mod git;
 pub mod mqtt;
 pub mod service_trait;
 
+/// Struct to hold the Factory+ service interfaces and service urls.
 pub struct ServiceClient {
     pub auth_interface: AuthInterface,
     pub config_db_interface: ConfigDbInterface,
@@ -56,7 +61,12 @@ impl ServiceClient {
             auth_interface: AuthInterface::new(),
             config_db_interface: ConfigDbInterface::new(),
             directory_interface: DirectoryInterface::new(),
-            discovery_interface: DiscoveryInterface::new(),
+            discovery_interface: DiscoveryInterface::from(
+                auth_url.map(String::from),
+                config_db_url.map(String::from),
+                Some(String::from(directory_url)),
+                mqtt_url.map(String::from),
+            ),
             fetch_interface: FetchInterface::new(),
             mqtt_interface: MQTTInterface::new(),
         }
@@ -75,7 +85,7 @@ impl ServiceCreds {
             service_password: String::new(),
         }
     }
-    
+
     pub fn from(user_str: &str, pass_str: &str) -> Self {
         ServiceCreds {
             service_username: String::from(user_str),
