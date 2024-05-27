@@ -1,4 +1,9 @@
+//! Module to hold pre-defined UUIDs for Factory+ elements.
+//!
+//! Each UUID is a constant uuid::Uuid.
+
 pub mod types {
+    //! Holds UUIDs for types.
     pub const APP: uuid::Uuid = uuid::uuid!("d319bd87-f42b-4b66-be4f-f82ff48b93f0");
     pub const CLASS: uuid::Uuid = uuid::uuid!("04a1c90d-2295-4cbe-b33a-74eded62cbf1");
     pub const DEVICE: uuid::Uuid = uuid::uuid!("18773d6d-a70d-443a-b29a-3f1583195290");
@@ -14,12 +19,14 @@ pub mod types {
 }
 
 pub mod special {
+    //! Holds UUID references for NULL, FACTORY_PLUS, and SELF.
     pub const NULL: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-000000000000");
     pub const FACTORY_PLUS: uuid::Uuid = uuid::uuid!("11ad7b32-1d32-4c4a-b0c9-fa049208939a");
     pub const SELF: uuid::Uuid = uuid::uuid!("5855a1cc-46d8-4b16-84f8-ab3916ecb230");
 }
 
 pub mod app {
+    //! Holds Sparkplug app UUIDs.
     pub const REGISTRATION: uuid::Uuid = uuid::uuid!("cb40bed5-49ad-4443-a7f5-08c75009da8f");
     pub const INFO: uuid::Uuid = uuid::uuid!("64a8bfa9-7772-45c4-9d1a-9e6290690957");
     pub const SPARKPLUG_ADDRESS: uuid::Uuid = uuid::uuid!("8e32801b-f35a-4cbf-a5c3-2af64d3debd7");
@@ -28,11 +35,13 @@ pub mod app {
 }
 
 pub mod schema {
+    //! Holds Factory+ schema UUIDs.
     pub const DEVICE_INFORMATION: uuid::Uuid = uuid::uuid!("2dd093e9-1450-44c5-be8c-c0d78e48219b");
     pub const SERVICE: uuid::Uuid = uuid::uuid!("05688a03-730e-4cda-9932-172e2c62e45c");
 }
 
 pub mod service {
+    //! Holds UUIDs for the Factory+ services.
     pub const DIRECTORY: uuid::Uuid = uuid::uuid!("af4a1d66-e6f7-43c4-8a67-0fa3be2b1cf9");
     pub const CONFIG_DB: uuid::Uuid = uuid::uuid!("af15f175-78a0-4e05-97c0-2a0bb82b9f3b");
     pub const AUTHENTICATION: uuid::Uuid = uuid::uuid!("cab2642a-f7d9-42e5-8845-8f35affe1fd4");
@@ -43,21 +52,27 @@ pub mod service {
 }
 
 pub mod permission {
+    //! Holds UUIDs for Factory+ permissions handling.
     pub mod auth {
+        //! Holds UUIDs for authentication.
         pub const READ_ACL: uuid::Uuid = uuid::uuid!("ba566181-0e8a-405b-b16e-3fb89130fbee");
         pub const MANAGE_KERBEROS: uuid::Uuid = uuid::uuid!("327c4cc8-9c46-4e1e-bb6b-257ace37b0f6");
         pub const MANAGE_ACL: uuid::Uuid = uuid::uuid!("3a41f5ce-fc08-4669-9762-ec9e71061168");
         pub const MANAGE_GROUP: uuid::Uuid = uuid::uuid!("be9b6d47-c845-49b2-b9d5-d87b83f11c3b");
     }
     pub mod cmd_esc {
+        //! Holds UUIDs for command escalation.
         pub const REBIRTH: uuid::Uuid = uuid::uuid!("fbb9c25d-386d-4966-a325-f16471d9f7be");
     }
     pub mod config_db {
+        //! Holds UUIDs for interacting with the Factory+ ConfigDB service.
         pub const READ_CONFIG: uuid::Uuid = uuid::uuid!("4a339562-cd57-408d-9d1a-6529a383ea4b");
         pub const WRITE_CONFIG: uuid::Uuid = uuid::uuid!("6c799ccb-d2ad-4715-a2a7-3c8728d6c0bf");
         pub const MANAGE_OBJECTS: uuid::Uuid = uuid::uuid!("f0b7917b-d475-4888-9d5a-2af96b3c26b6");
     }
     pub mod directory {
-        pub const ADVERTISE_SERVICE: uuid::Uuid = uuid::uuid!("4db4c39a-f18d-4e83-aeb0-5af2c14ddc2b");
+        //! Holds UUIDs for interacting with the Factory+ Directory service.
+        pub const ADVERTISE_SERVICE: uuid::Uuid =
+            uuid::uuid!("4db4c39a-f18d-4e83-aeb0-5af2c14ddc2b");
     }
 }
