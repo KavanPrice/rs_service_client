@@ -18,6 +18,14 @@ pub struct DiscoveryInterface {
 }
 
 impl DiscoveryInterface {
+    ///Create a new empty DiscoveryInterface.
+    pub fn new() -> Self {
+        DiscoveryInterface {
+            urls: HashMap::new(),
+            directory_interface: Arc::new(DirectoryInterface::new()),
+        }
+    }
+
     /// Create a new DiscoveryInterface from the service URLs:
     /// Authentication, ConfigDB, Directory, MQTT.
     ///

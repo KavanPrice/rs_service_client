@@ -2,14 +2,19 @@
 //!
 //! ServiceClient holds the service interfaces, credentials, and service urls.
 
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
+use crate::error::FetchError;
 use crate::service::auth::AuthInterface;
 use crate::service::configdb::ConfigDbInterface;
 use crate::service::directory::DirectoryInterface;
 use crate::service::discovery::DiscoveryInterface;
-use crate::service::fetch::FetchInterface;
 use crate::service::mqtt::MQTTInterface;
+use crate::service::service_trait::request::ServiceOpts;
+use crate::service::service_trait::response::TokenStruct;
 
 pub mod auth;
 pub mod cmdesc;
@@ -17,18 +22,21 @@ pub mod configdb;
 pub mod configdb_watcher;
 pub mod directory;
 pub mod discovery;
-pub mod fetch;
 pub mod git;
 pub mod mqtt;
 pub mod service_trait;
 
 /// Struct to hold the Factory+ service interfaces and service urls.
 pub struct ServiceClient {
+    in_flight_tokens:
+        HashMap<String, Pin<Box<dyn Future<Output = Result<TokenStruct, FetchError>> + Send>>>,
+    tokens: HashMap<String, TokenStruct>,
+    http_client: Arc<reqwest::Client>,
+
     pub auth_interface: AuthInterface,
     pub config_db_interface: ConfigDbInterface,
     pub directory_interface: Arc<DirectoryInterface>,
-    pub discovery_interface: DiscoveryInterface,
-    pub fetch_interface: FetchInterface,
+    pub discovery_interface: Arc<DiscoveryInterface>,
     pub mqtt_interface: MQTTInterface,
 
     service_creds: ServiceCreds,
@@ -41,7 +49,8 @@ pub struct ServiceClient {
 }
 
 impl ServiceClient {
-    pub fn new(
+    /// Create a new `ServiceClient` from the given credentials and urls.
+    pub fn from(
         service_username: &str,
         service_password: &str,
         root_principle: Option<&str>,
@@ -52,8 +61,19 @@ impl ServiceClient {
         mqtt_url: Option<&str>,
     ) -> Self {
         let directory_interface = Arc::new(DirectoryInterface::new());
+        let discovery_interface = Arc::new(DiscoveryInterface::from(
+            auth_url.map(String::from),
+            config_db_url.map(String::from),
+            Some(String::from(directory_url)),
+            mqtt_url.map(String::from),
+            Arc::clone(&directory_interface),
+        ));
 
         ServiceClient {
+            in_flight_tokens: HashMap::new(),
+            tokens: HashMap::new(),
+            http_client: Arc::new(reqwest::Client::new()),
+
             service_creds: ServiceCreds::from(service_username, service_password),
             root_principle: root_principle.map(String::from),
             permission_group: permission_group.map(String::from),
@@ -65,15 +85,27 @@ impl ServiceClient {
             auth_interface: AuthInterface::new(),
             config_db_interface: ConfigDbInterface::new(),
             directory_interface: Arc::clone(&directory_interface),
-            discovery_interface: DiscoveryInterface::from(
-                auth_url.map(String::from),
-                config_db_url.map(String::from),
-                Some(String::from(directory_url)),
-                mqtt_url.map(String::from),
-                Arc::clone(&directory_interface),
-            ),
-            fetch_interface: FetchInterface::new(),
+            discovery_interface: Arc::clone(&discovery_interface),
             mqtt_interface: MQTTInterface::new(),
+        }
+    }
+
+    /// Build a new `FetchRequest` using `&mut self`. This requires a `ServiceOpts` struct
+    /// containing the service options for the request and an optional service UUID.
+    /// 
+    /// This is used to make fetch requests to the Factory+ stack using
+    /// `rs_service_client::service::service_trait::Service::fetch()`.
+    pub fn new_fetch_request(&mut self, opts: ServiceOpts, maybe_target_service_uuid: Option<uuid::Uuid>) -> FetchRequest {
+        FetchRequest {
+            service_username: self.service_creds.service_username.clone(),
+            service_password: self.service_creds.service_password.clone(),
+            opts,
+            client: Arc::clone(&self.http_client),
+            directory_url: self.directory_url.clone(),
+            discovery_interface: Arc::clone(&self.discovery_interface),
+            maybe_target_service_uuid,
+            in_flight_tokens: &mut self.in_flight_tokens,
+            tokens: &mut self.tokens,
         }
     }
 }
@@ -97,4 +129,19 @@ impl ServiceCreds {
             service_password: String::from(pass_str),
         }
     }
+}
+
+pub struct FetchRequest<'a, 'b> {
+    service_username: String,
+    service_password: String,
+    opts: ServiceOpts,
+    client: Arc<reqwest::Client>,
+    directory_url: String,
+    discovery_interface: Arc<DiscoveryInterface>,
+    maybe_target_service_uuid: Option<uuid::Uuid>,
+    in_flight_tokens: &'a mut HashMap<
+        String,
+        Pin<Box<dyn Future<Output = Result<TokenStruct, FetchError>> + Send>>,
+    >,
+    tokens: &'b mut HashMap<String, TokenStruct>,
 }
