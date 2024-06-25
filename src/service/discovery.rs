@@ -2,8 +2,8 @@
 //! Discovery service.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
+use crate::error::FetchError;
 use crate::service::directory::DirectoryInterface;
 use crate::service::service_trait::Service;
 use crate::uuids;
@@ -13,19 +13,18 @@ use crate::uuids;
 /// DiscoveryInterface holds a hashmap from service UUIDs to service URLs. These can be queried
 /// locally and can use the Directory service if not found locally.
 pub struct DiscoveryInterface {
-    urls: HashMap<uuid::Uuid, Vec<String>>,
-    directory_interface: Arc<DirectoryInterface>,
+    pub urls: HashMap<uuid::Uuid, Vec<String>>,
 }
 
 impl DiscoveryInterface {
-    ///Create a new empty DiscoveryInterface.
     pub fn new() -> Self {
         DiscoveryInterface {
             urls: HashMap::new(),
-            directory_interface: Arc::new(DirectoryInterface::new()),
         }
     }
+}
 
+impl DiscoveryInterface {
     /// Create a new DiscoveryInterface from the service URLs:
     /// Authentication, ConfigDB, Directory, MQTT.
     ///
@@ -36,7 +35,6 @@ impl DiscoveryInterface {
         config_db_url: Option<String>,
         directory_url: Option<String>,
         mqtt_url: Option<String>,
-        directory_interface: Arc<DirectoryInterface>,
     ) -> Self {
         let mut urls_map: HashMap<uuid::Uuid, Vec<String>> = HashMap::new();
 
@@ -57,10 +55,7 @@ impl DiscoveryInterface {
         ]
         .into_iter()
         .for_each(insert_maybe_url);
-        DiscoveryInterface {
-            urls: urls_map,
-            directory_interface,
-        }
+        DiscoveryInterface { urls: urls_map }
     }
 
     /// Inserts a (uuid, url) pair into the urls map. This overwrites the current vector or urls.
@@ -86,17 +81,26 @@ impl DiscoveryInterface {
     /// Gets all known URLS that point to a service with the given UUID.
     /// The preconfigured URLS are queried first. If the service is not found, the Directory service
     /// is queried.
-    pub async fn get_service_urls(&self, service_uuid: uuid::Uuid) -> Option<Vec<String>> {
+    pub async fn get_service_urls(
+        &self,
+        service_uuid: uuid::Uuid,
+        directory_interface: &DirectoryInterface,
+    ) -> Result<Option<Vec<String>>, FetchError> {
         if let Some(url) = self.urls.get(&service_uuid).cloned() {
-            Some(url)
+            Ok(Some(url))
         } else {
-            self.find_service_urls(service_uuid).await
+            self.find_service_urls(service_uuid, directory_interface)
+                .await
         }
     }
 
     /// Use the given Directory service to find the urls for the given service.
-    pub async fn find_service_urls(&self, service_uuid: uuid::Uuid) -> Option<Vec<String>> {
-        self.directory_interface.service_urls(service_uuid).await
+    pub async fn find_service_urls(
+        &self,
+        service_uuid: uuid::Uuid,
+        directory_interface: &DirectoryInterface,
+    ) -> Result<Option<Vec<String>>, FetchError> {
+        directory_interface.service_urls(service_uuid, self).await
     }
 }
 

@@ -4,11 +4,12 @@ use std::sync::Arc;
 use http::header;
 
 use crate::error::{FetchError, ServiceError};
+use crate::service::directory::DirectoryInterface;
 use crate::service::discovery::DiscoveryInterface;
-use crate::service::service_trait::fetch_util::{do_fetch, is_idempotent};
+use crate::service::FetchRequest;
+use crate::service::service_trait::fetch_util::do_fetch;
 use crate::service::service_trait::request::ServiceOpts;
 use crate::service::service_trait::response::{FetchResponse, PingResponse};
-use crate::service::FetchRequest;
 use crate::uuids;
 
 pub trait Service {
@@ -29,7 +30,8 @@ pub trait Service {
     /// Fetch a resource.
     async fn fetch<'a, 'b>(
         &self,
-        fetch_request: &mut FetchRequest<'a, 'b>,
+        fetch_request: &FetchRequest<'a, 'b>,
+        directory_interface: &DirectoryInterface,
     ) -> Result<FetchResponse, FetchError> {
         // Set up a HeaderValue from &str "application/json"
         let json_header_val = {
@@ -64,37 +66,51 @@ pub trait Service {
 
         // From Fetch.cs
         let mut service_urls: Vec<String> = Vec::new();
-        if let Some(service_uuid) = fetch_request.maybe_target_service_uuid {
-            service_urls.append(
-                &mut fetch_request
-                    .discovery_interface
-                    .get_service_urls(service_uuid)
-                    .await
-                    .unwrap_or_default(),
-            );
-            let default_string = &mut String::new();
-            let amended_url = service_urls.first_mut().unwrap_or(default_string);
-            amended_url.push('/');
-            amended_url.push_str(&fetch_request.opts.url);
-            fetch_request.opts.url.clone_from(amended_url);
-        }
+        let opts = {
+            if let Some(service_uuid) = fetch_request.maybe_target_service_uuid {
+                service_urls.append(
+                    &mut fetch_request
+                        .discovery_interface
+                        .get_service_urls(service_uuid, directory_interface)
+                        .await
+                        .unwrap_or_default()
+                        .unwrap(),
+                );
+                let default_string = &mut String::new();
+                let amended_url = service_urls.first_mut().unwrap_or(default_string);
+                amended_url.push('/');
+                amended_url.push_str(&fetch_request.opts.url);
+                ServiceOpts {
+                    url: (*amended_url.clone()).parse().unwrap(),
+                    method: fetch_request.opts.method.clone(),
+                    headers: fetch_request.opts.headers.clone(),
+                    query: fetch_request.opts.query.clone(),
+                    body: fetch_request.opts.body.clone(),
+                }
+            } else {
+                fetch_request.opts.clone()
+            }
+        };
 
         // TODO: Implement piggybacking for idempotent requests like in cs-serviceclient
 
         do_fetch(
             Arc::clone(&fetch_request.client),
-            &fetch_request.opts,
+            &opts,
             fetch_request.service_username.clone(),
             fetch_request.service_password.clone(),
             fetch_request.tokens,
-            fetch_request.in_flight_tokens,
         )
         .await
     }
 
     /// Attempts to ping the stack.
-    async fn ping(&self, client: Arc<reqwest::Client>) -> Result<Option<PingResponse>, FetchError> {
-        let mut fetch_request = FetchRequest {
+    async fn ping(
+        &self,
+        client: Arc<reqwest::Client>,
+        directory_interface: &DirectoryInterface,
+    ) -> Result<Option<PingResponse>, FetchError> {
+        let fetch_request = FetchRequest {
             service_username: String::new(),
             service_password: String::new(),
             opts: {
@@ -104,13 +120,12 @@ pub trait Service {
             },
             client,
             directory_url: String::from(""),
-            discovery_interface: Arc::new(DiscoveryInterface::new()),
+            discovery_interface: &DiscoveryInterface::new(),
             maybe_target_service_uuid: None,
-            in_flight_tokens: &mut Default::default(),
             tokens: &mut Default::default(),
         };
 
-        let response = self.fetch(&mut fetch_request).await?;
+        let response = self.fetch(&fetch_request, directory_interface).await?;
 
         if response.status != http::StatusCode::OK.as_u16() as i32 {
             Ok(None)
@@ -182,6 +197,7 @@ pub mod request {
     //! Contains request representations and implementations.
     use std::collections::HashMap;
 
+    #[derive(Clone)]
     pub struct ServiceOpts {
         pub url: String,
         pub method: HttpRequestMethod,
@@ -205,7 +221,7 @@ pub mod request {
     /// HttpRequestMethod defines the subset of methods supported by this implementation.
     ///
     /// to_method() converts a HttpRequestMethod to a http::Method.
-    #[derive(PartialEq, Eq)]
+    #[derive(PartialEq, Eq, Clone)]
     pub enum HttpRequestMethod {
         GET,
         POST,
@@ -271,8 +287,6 @@ pub mod response {
 pub(super) mod fetch_util {
     //! Contains utilities used by fetch().
     use std::collections::HashMap;
-    use std::future::Future;
-    use std::pin::Pin;
     use std::str::FromStr;
     use std::sync::Arc;
 
@@ -283,16 +297,12 @@ pub(super) mod fetch_util {
     use crate::service::service_trait::request::{HttpRequestMethod, ServiceOpts};
     use crate::service::service_trait::response::{FetchResponse, TokenStruct};
 
-    pub(super) async fn do_fetch(
+    pub(crate) async fn do_fetch(
         client: Arc<reqwest::Client>,
         opts: &ServiceOpts,
         username: String,
         password: String,
-        tokens: &mut HashMap<String, TokenStruct>,
-        in_flight_tokens: &mut HashMap<
-            String,
-            Pin<Box<dyn Future<Output = Result<TokenStruct, FetchError>> + Send>>,
-        >,
+        tokens: &HashMap<String, TokenStruct>,
     ) -> Result<FetchResponse, FetchError> {
         let response = try_fetch(
             client.clone(),
@@ -300,20 +310,11 @@ pub(super) mod fetch_util {
             username.clone(),
             password.clone(),
             tokens,
-            in_flight_tokens,
         )
         .await;
         if let Ok(resp) = &response {
             if resp.status == StatusCode::UNAUTHORIZED.as_u16() as i32 {
-                try_fetch(
-                    client,
-                    opts,
-                    username.clone(),
-                    password.clone(),
-                    tokens,
-                    in_flight_tokens,
-                )
-                .await
+                try_fetch(client, opts, username.clone(), password.clone(), tokens).await
             } else {
                 response
             }
@@ -327,11 +328,7 @@ pub(super) mod fetch_util {
         opts: &ServiceOpts,
         username: String,
         password: String,
-        tokens: &mut HashMap<String, TokenStruct>,
-        in_flight_tokens: &mut HashMap<
-            String,
-            Pin<Box<dyn Future<Output = Result<TokenStruct, FetchError>> + Send>>,
-        >,
+        tokens: &HashMap<String, TokenStruct>,
     ) -> Result<FetchResponse, FetchError> {
         let empty_token = TokenStruct {
             token: String::new(),
@@ -345,7 +342,6 @@ pub(super) mod fetch_util {
             password,
             Some(&empty_token),
             tokens,
-            in_flight_tokens,
         )
         .await;
 
@@ -429,43 +425,13 @@ pub(super) mod fetch_util {
         username: String,
         password: String,
         bad_token: Option<&TokenStruct>,
-        tokens: &mut HashMap<String, TokenStruct>,
-        in_flight_tokens: &mut HashMap<
-            String,
-            Pin<Box<dyn Future<Output = Result<TokenStruct, FetchError>> + Send>>,
-        >,
+        tokens: &HashMap<String, TokenStruct>,
     ) -> Result<TokenStruct, FetchError> {
         let maybe_local_token = tokens.get(&service_url);
 
         // If there's no token in the local token HashMap
         if maybe_local_token.is_none() {
-            // If there's a possible in-flight token
-            return if let Some(in_flight_token_result) = in_flight_tokens.get_mut(&service_url) {
-                // Return the possible token. The caller must unwrap the result
-                in_flight_token_result.await
-            } else {
-                // If there's no in-flight token, request a token with fetch_token
-                let token_request = fetch_token(client, service_url.clone(), username, password);
-
-                // Add the Future to the in_flight_tokens HashMap
-                in_flight_tokens.insert(service_url.clone(), Box::pin(token_request));
-
-                // Await response
-                let response_result = in_flight_tokens.get_mut(&service_url).unwrap().await;
-
-                // If we have a token
-                if let Ok(token) = response_result {
-                    // Add it to the tokens HashMap and return it
-                    tokens.insert(service_url.clone(), token.clone());
-                    Ok(token)
-                } else {
-                    // Otherwise return the error
-                    Err(FetchError {
-                        message: String::from("Error fetching new token."),
-                        url: service_url.clone(),
-                    })
-                }
-            };
+            fetch_token(client, service_url.clone(), username, password).await
         } else {
             // If there is a local token, check against the bad token if it exists
             let token = maybe_local_token.unwrap();
@@ -482,26 +448,7 @@ pub(super) mod fetch_util {
                 Ok(token.clone())
             } else {
                 // Otherwise request a new one
-                let token_request = fetch_token(client, service_url.clone(), username, password);
-
-                // Add the Future to the in_flight_tokens HashMap
-                in_flight_tokens.insert(service_url.clone(), Box::pin(token_request));
-
-                // Await response
-                let response_result = in_flight_tokens.get_mut(&service_url).unwrap().await;
-
-                // If we have a token
-                if let Ok(token) = response_result {
-                    // Add it to the tokens HashMap and return it
-                    tokens.insert(service_url.clone(), token.clone());
-                    Ok(token)
-                } else {
-                    // Otherwise return the error
-                    Err(FetchError {
-                        message: String::from("Error fetching new token."),
-                        url: service_url.clone(),
-                    })
-                }
+                fetch_token(client, service_url.clone(), username, password).await
             }
         }
     }

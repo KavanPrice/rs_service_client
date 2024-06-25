@@ -23,7 +23,7 @@ impl Display for ServiceError {
 
 impl Error for ServiceError {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FetchError {
     pub message: String,
     pub url: String,
