@@ -6,10 +6,10 @@ use http::header;
 use crate::error::{FetchError, ServiceError};
 use crate::service::directory::DirectoryInterface;
 use crate::service::discovery::DiscoveryInterface;
-use crate::service::FetchRequest;
 use crate::service::service_trait::fetch_util::do_fetch;
 use crate::service::service_trait::request::ServiceOpts;
 use crate::service::service_trait::response::{FetchResponse, PingResponse};
+use crate::service::FetchRequest;
 use crate::uuids;
 
 pub trait Service {

@@ -27,7 +27,8 @@ pub mod mqtt;
 pub mod service_trait;
 
 /// Complex type to hold tokens in flight.
-pub type InFlightTokensMap = HashMap<String, Pin<Box<dyn Future<Output = Result<TokenStruct, FetchError>> + Send>>>;
+pub type InFlightTokensMap =
+    HashMap<String, Pin<Box<dyn Future<Output = Result<TokenStruct, FetchError>> + Send>>>;
 
 /// Struct to hold the Factory+ service interfaces and service urls.
 pub struct ServiceClient {
