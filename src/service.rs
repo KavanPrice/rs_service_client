@@ -85,6 +85,12 @@ impl ServiceClient {
             String::from(directory_url),
         );
 
+        let mqtt_interface = MQTTInterface::from(
+            String::from(service_username),
+            String::from(service_password),
+            Arc::clone(&client),
+        );
+
         ServiceClient {
             tokens: HashMap::new(),
             http_client: Arc::clone(&client),
@@ -97,11 +103,11 @@ impl ServiceClient {
             directory_url: String::from(directory_url),
             mqtt_url: mqtt_url.map(String::from),
 
-            auth_interface: AuthInterface::new(),
+            auth_interface: AuthInterface::from(),
             config_db_interface,
             directory_interface,
             discovery_interface,
-            mqtt_interface: MQTTInterface::new(),
+            mqtt_interface,
         }
     }
 
