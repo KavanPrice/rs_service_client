@@ -78,6 +78,13 @@ impl ServiceClient {
             mqtt_url.map(String::from),
         );
 
+        let config_db_interface = ConfigDbInterface::from(
+            String::from(service_username),
+            String::from(service_password),
+            Arc::clone(&client),
+            String::from(directory_url),
+        );
+
         ServiceClient {
             tokens: HashMap::new(),
             http_client: Arc::clone(&client),
@@ -91,7 +98,7 @@ impl ServiceClient {
             mqtt_url: mqtt_url.map(String::from),
 
             auth_interface: AuthInterface::new(),
-            config_db_interface: ConfigDbInterface::new(),
+            config_db_interface,
             directory_interface,
             discovery_interface,
             mqtt_interface: MQTTInterface::new(),
