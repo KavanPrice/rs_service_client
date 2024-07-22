@@ -40,3 +40,24 @@ impl Display for FetchError {
 }
 
 impl Error for FetchError {}
+
+#[derive(Debug)]
+pub struct MqttError {
+    pub message: String,
+}
+
+impl Display for MqttError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MQTT error: {}.", self.message,)
+    }
+}
+
+impl From<FetchError> for MqttError {
+    fn from(fetch_error: FetchError) -> Self {
+        MqttError {
+            message: fetch_error.message,
+        }
+    }
+}
+
+impl Error for MqttError {}
