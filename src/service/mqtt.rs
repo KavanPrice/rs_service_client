@@ -1,3 +1,6 @@
+//! This module provides an implementation of MQTTInterface for interacting with the Factory+
+//! MQTT service.
+
 use std::sync::Arc;
 use std::sync::mpsc;
 
@@ -12,6 +15,7 @@ use crate::service::mqtt::protocol::MqttProtocol;
 use crate::service::service_trait::{Service, ServiceType};
 use crate::uuids;
 
+/// The interface for the Factory+ MQTT service.
 pub struct MQTTInterface {
     service_type: ServiceType,
     service_username: String,

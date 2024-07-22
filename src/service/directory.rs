@@ -1,3 +1,6 @@
+//! This module provides an implementation of DirectoryInterface for interacting with the Factory+
+//! Directory service.
+
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
@@ -7,15 +10,14 @@ use http::header;
 use crate::error::FetchError;
 use crate::service::directory::service_provider::ServiceProvider;
 use crate::service::discovery::DiscoveryInterface;
+use crate::service::FetchRequest;
+use crate::service::service_trait::{Service, ServiceType};
 use crate::service::service_trait::request::{HttpRequestMethod, ServiceOpts};
 use crate::service::service_trait::response::{FetchResponse, TokenStruct};
-use crate::service::service_trait::{Service, ServiceType};
-use crate::service::FetchRequest;
 
 /// The interface for the Factory+ Directory service.
 ///
-/// DirectoryInterface holds a hashmap from service UUIDs to service URLs. These can be queried
-/// locally and can use the Directory service if not found locally.
+/// DirectoryInterface holds a hashmap from service URLS to tokens.
 pub struct DirectoryInterface {
     service_type: ServiceType,
     service_username: String,
