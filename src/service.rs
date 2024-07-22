@@ -103,7 +103,7 @@ impl ServiceClient {
             directory_url: String::from(directory_url),
             mqtt_url: mqtt_url.map(String::from),
 
-            auth_interface: AuthInterface::from(),
+            auth_interface: AuthInterface::new(),
             config_db_interface,
             directory_interface,
             discovery_interface,
