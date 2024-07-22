@@ -26,12 +26,6 @@ pub struct DirectoryInterface {
 }
 
 impl DirectoryInterface {
-    pub fn new() -> Self {
-        todo!()
-    }
-}
-
-impl DirectoryInterface {
     /// Create a new `DirectoryInterface` from a username, password, HTTP client, and directory url.
     pub fn from(
         service_username: String,
