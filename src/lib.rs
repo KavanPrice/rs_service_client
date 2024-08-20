@@ -1,4 +1,4 @@
-mod error;
-mod service;
-mod sparkplug;
-mod uuids;
+pub mod error;
+pub mod service;
+pub mod sparkplug;
+pub mod uuids;
