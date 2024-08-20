@@ -1,20 +1,34 @@
 //! This module provides an implementation of AuthInterface for interacting with the Factory+
 //! Auth service.
 
+use std::sync::Arc;
+
 use crate::service::service_trait::{Service, ServiceType};
 use crate::uuids;
 
-///
 pub struct AuthInterface {
     service_type: ServiceType,
+    service_username: String,
+    service_password: String,
+    http_client: Arc<reqwest::Client>,
+    directory_url: String,
 }
 
 impl AuthInterface {
-    pub fn new() -> Self {
+    pub fn from(
+        service_username: String,
+        service_password: String,
+        http_client: Arc<reqwest::Client>,
+        directory_url: String,
+    ) -> Self {
         AuthInterface {
             service_type: ServiceType::Authentication {
                 uuid: uuids::service::AUTHENTICATION,
             },
+            service_username,
+            service_password,
+            http_client: Arc::clone(&http_client),
+            directory_url,
         }
     }
 

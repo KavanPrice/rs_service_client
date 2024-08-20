@@ -17,12 +17,9 @@ use crate::service::service_trait::request::ServiceOpts;
 use crate::service::service_trait::response::TokenStruct;
 
 pub mod auth;
-pub mod cmdesc;
 pub mod configdb;
-pub mod configdb_watcher;
 pub mod directory;
 pub mod discovery;
-pub mod git;
 pub mod mqtt;
 pub mod service_trait;
 
@@ -91,6 +88,13 @@ impl ServiceClient {
             Arc::clone(&client),
         );
 
+        let auth_interface = AuthInterface::from(
+            String::from(service_username),
+            String::from(service_password),
+            Arc::clone(&client),
+            String::from(directory_url),
+        );
+
         ServiceClient {
             tokens: HashMap::new(),
             http_client: Arc::clone(&client),
@@ -103,7 +107,7 @@ impl ServiceClient {
             directory_url: String::from(directory_url),
             mqtt_url: mqtt_url.map(String::from),
 
-            auth_interface: AuthInterface::new(),
+            auth_interface,
             config_db_interface,
             directory_interface,
             discovery_interface,
