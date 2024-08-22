@@ -6,10 +6,10 @@ use http::header;
 use crate::error::{FetchError, ServiceError};
 use crate::service::directory::DirectoryInterface;
 use crate::service::discovery::DiscoveryInterface;
+use crate::service::FetchRequest;
 use crate::service::service_trait::fetch_util::do_fetch;
 use crate::service::service_trait::request::ServiceOpts;
 use crate::service::service_trait::response::{FetchResponse, PingResponse};
-use crate::service::FetchRequest;
 use crate::uuids;
 
 pub trait Service {
@@ -274,11 +274,11 @@ pub mod response {
     #[derive(Deserialize, Clone)]
     pub struct TokenStruct {
         pub token: String,
-        pub expiry: String,
+        pub expiry: u64,
     }
 
     impl TokenStruct {
-        pub fn from(token: String, expiry: String) -> Self {
+        pub fn from(token: String, expiry: u64) -> Self {
             TokenStruct { token, expiry }
         }
     }
@@ -330,194 +330,143 @@ pub(super) mod fetch_util {
         password: String,
         tokens: &HashMap<String, TokenStruct>,
     ) -> Result<FetchResponse, FetchError> {
-        let empty_token = TokenStruct {
-            token: String::new(),
-            expiry: String::new(),
+        let token =
+            get_service_token(client.clone(), opts.url.clone(), username, password, tokens).await?;
+
+        // Set up a HeaderValue from &str "application/json"
+        let json_header_val = {
+            let maybe_header_val = header::HeaderValue::from_str("application/json");
+            if let Ok(header_val) = maybe_header_val {
+                header_val
+            } else {
+                return Err(FetchError {
+                    message: String::from("Couldn't create correct header value."),
+                    url: opts.url.clone(),
+                });
+            }
         };
 
-        let token = service_token(
-            client.clone(),
-            opts.url.clone(),
-            username,
-            password,
-            Some(&empty_token),
-            tokens,
-        )
-        .await;
+        let mut local_headers = opts.headers.clone();
+        local_headers
+            .entry(header::ACCEPT)
+            .or_insert(json_header_val.clone());
 
-        if let Ok(t) = token {
-            if t.token == String::new() || t.token == String::from("") {
-                return Ok(FetchResponse::from(401, String::from("")));
+        if opts.body.is_some() {
+            local_headers
+                .entry(header::CONTENT_TYPE)
+                .or_insert(json_header_val);
+        }
+
+        let headers_with_auth =
+            add_auth_headers(&mut local_headers, String::from("Bearer"), token.token)?;
+
+        let mut builder = client
+            .request(opts.method.to_method(), opts.url.clone())
+            .headers(headers_with_auth.clone());
+
+        let request_url_result = reqwest::Url::from_str(&*opts.url);
+        if let Ok(mut request_url) = request_url_result {
+            let mut query_pairs = request_url.query_pairs_mut();
+            for (key, value) in opts.query.clone() {
+                query_pairs.append_pair(&key, &value);
+            }
+            let response = if let Some(body) = opts.body.clone() {
+                builder.body(body).send().await
             } else {
-                // Set up a HeaderValue from &str "application/json"
-                let json_header_val = {
-                    let maybe_header_val = header::HeaderValue::from_str("application/json");
-                    if let Ok(header_val) = maybe_header_val {
-                        header_val
-                    } else {
-                        return Err(FetchError {
-                            message: String::from("Couldn't create correct header value."),
-                            url: opts.url.clone(),
-                        });
-                    }
-                };
+                builder.send().await
+            };
 
-                let mut local_headers = opts.headers.clone();
-                local_headers
-                    .entry(header::ACCEPT)
-                    .or_insert(json_header_val.clone());
+            if let Ok(resp) = response {
+                Ok(FetchResponse::from(
+                    resp.status().as_u16() as i32,
+                    resp.text().await.unwrap(),
+                ))
+            } else {
+                Err(FetchError {
+                    message: String::from("Couldn't make request"),
+                    url: opts.url.clone(),
+                })
+            }
+        } else {
+            Err(FetchError {
+                message: String::from("Couldn't make request."),
+                url: opts.url.clone(),
+            })
+        }
+    }
 
-                if opts.body.is_some() {
-                    local_headers
-                        .entry(header::CONTENT_TYPE)
-                        .or_insert(json_header_val);
-                }
-
-                let headers_with_auth =
-                    add_auth_headers(&mut local_headers, String::from("Bearer"), t.token)?;
-
-                let mut builder = client
-                    .request(opts.method.to_method(), opts.url.clone())
-                    .headers(headers_with_auth.clone());
-
-                let request_url_result = reqwest::Url::from_str(&*opts.url);
-                if let Ok(mut request_url) = request_url_result {
-                    let mut query_pairs = request_url.query_pairs_mut();
-                    for (key, value) in opts.query.clone() {
-                        query_pairs.append_pair(&key, &value);
-                    }
-                    let response = if let Some(body) = opts.body.clone() {
-                        builder.body(body).send().await
-                    } else {
-                        builder.send().await
-                    };
-                    //let response = builder.send().await;
-
-                    if let Ok(resp) = response {
-                        Ok(FetchResponse::from(
-                            resp.status().as_u16() as i32,
-                            resp.text().await.unwrap(),
-                        ))
-                    } else {
-                        Err(FetchError {
-                            message: String::from("Couldn't make request"),
-                            url: opts.url.clone(),
-                        })
+    async fn get_service_token(
+        client: Arc<reqwest::Client>,
+        service_url: String,
+        username: String,
+        password: String,
+        tokens: &HashMap<String, TokenStruct>,
+    ) -> Result<TokenStruct, FetchError> {
+        // If we find a local token, return it. Otherwise, we request a new one.
+        if let Some(token) = tokens.get(&service_url) {
+            Ok(token.clone())
+        } else {
+            let token_url = format!("{}/token", service_url);
+            if let Ok(request) = client
+                .post(service_url)
+                .basic_auth(username, Some(password))
+                .build()
+            {
+                if let Ok(response) = client.execute(request).await {
+                    match response.status() {
+                        http::StatusCode::OK => try_decode_token(response, token_url).await,
+                        http::StatusCode::UNAUTHORIZED => Err(FetchError {
+                            message: String::from("Error fetching new token: 401 Unauthorised."),
+                            url: token_url,
+                        }),
+                        http::StatusCode::INTERNAL_SERVER_ERROR => Err(FetchError {
+                            message: String::from("Error fetching new token - 500 Server error."),
+                            url: token_url,
+                        }),
+                        http::StatusCode::NOT_FOUND => Err(FetchError {
+                            message: String::from("Error fetching new token: 404 Not found."),
+                            url: token_url,
+                        }),
+                        _ => Err(FetchError {
+                            message: format!(
+                                "Error fetching new token: {}",
+                                response.status().as_str()
+                            ),
+                            url: token_url,
+                        }),
                     }
                 } else {
                     Err(FetchError {
-                        message: String::from("Couldn't make request."),
-                        url: opts.url.clone(),
+                        message: String::from("Couldn't build token request."),
+                        url: token_url,
                     })
                 }
-            }
-        } else {
-            Err(FetchError {
-                message: String::from(""),
-                url: String::from(""),
-            })
-        }
-    }
-
-    async fn service_token(
-        client: Arc<reqwest::Client>,
-        service_url: String,
-        username: String,
-        password: String,
-        bad_token: Option<&TokenStruct>,
-        tokens: &HashMap<String, TokenStruct>,
-    ) -> Result<TokenStruct, FetchError> {
-        let maybe_local_token = tokens.get(&service_url);
-
-        // If there's no token in the local token HashMap
-        if maybe_local_token.is_none() {
-            fetch_token(client, service_url.clone(), username, password).await
-        } else {
-            // If there is a local token, check against the bad token if it exists
-            let token = maybe_local_token.unwrap();
-            let is_bad = {
-                if let Some(bad) = bad_token {
-                    bad.token == token.token
-                } else {
-                    false
-                }
-            };
-
-            // If the local token is ok, return it
-            if (token.token != String::new() && token.token != String::from("")) && !is_bad {
-                Ok(token.clone())
-            } else {
-                // Otherwise request a new one
-                fetch_token(client, service_url.clone(), username, password).await
-            }
-        }
-    }
-
-    async fn fetch_token(
-        client: Arc<reqwest::Client>,
-        service_url: String,
-        username: String,
-        password: String,
-    ) -> Result<TokenStruct, FetchError> {
-        let token_url = format!("{}/{}", service_url, "token");
-        let response = gss_fetch(client, token_url.clone(), username, password).await?;
-
-        if response.status != http::StatusCode::OK.as_u16() as i32 {
-            Err(FetchError {
-                message: String::from("Token fetch failed."),
-                url: token_url,
-            })
-        } else {
-            let token_result: Result<TokenStruct, serde_json::Error> =
-                serde_json::from_str(&response.content);
-            if let Ok(token) = token_result {
-                Ok(token)
             } else {
                 Err(FetchError {
-                    message: String::from("Unable to deserialise response into a token."),
+                    message: String::from("Couldn't build a request to send for a token."),
                     url: token_url,
                 })
             }
         }
     }
-
-    async fn gss_fetch(
-        client: Arc<reqwest::Client>,
+    async fn try_decode_token(
+        response: reqwest::Response,
         token_url: String,
-        username: String,
-        password: String,
-    ) -> Result<FetchResponse, FetchError> {
-        let auth_string = format!("{}:{}", username, password);
-
-        let mut empty_headers = header::HeaderMap::new();
-        let headers = add_auth_headers(&mut empty_headers, String::from("Basic"), auth_string)?;
-
-        let request = client.post(&token_url).headers(headers.clone());
-        let response = request.send().await;
-
-        match response {
-            Ok(res) => {
-                if res.status() == http::StatusCode::UNAUTHORIZED {
+    ) -> Result<TokenStruct, FetchError> {
+        match response.text().await {
+            Ok(body) => {
+                if let Ok(token) = serde_json::from_str::<TokenStruct>(&body) {
+                    Ok(token)
+                } else {
                     Err(FetchError {
-                        message: String::from("Unable to authenticate with Basic auth."),
+                        message: String::from("Couldn't decode response into token"),
                         url: token_url,
                     })
-                } else {
-                    let status_code_i32 = res.status().as_u16() as i32;
-                    let body_result = res.text().await;
-                    if let Ok(body) = body_result {
-                        Ok(FetchResponse::from(status_code_i32, body))
-                    } else {
-                        Ok(FetchResponse::from(
-                            status_code_i32,
-                            String::from("Unable to decode body."),
-                        ))
-                    }
                 }
             }
-            Err(e) => Err(FetchError {
-                message: e.to_string(),
-                url: token_url.clone(),
+            Err(_) => Err(FetchError {
+                message: String::from("No response body."),
+                url: token_url,
             }),
         }
     }

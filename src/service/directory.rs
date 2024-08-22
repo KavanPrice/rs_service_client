@@ -10,10 +10,10 @@ use http::header;
 use crate::error::FetchError;
 use crate::service::directory::service_provider::ServiceProvider;
 use crate::service::discovery::DiscoveryInterface;
-use crate::service::FetchRequest;
-use crate::service::service_trait::{Service, ServiceType};
 use crate::service::service_trait::request::{HttpRequestMethod, ServiceOpts};
 use crate::service::service_trait::response::{FetchResponse, TokenStruct};
+use crate::service::service_trait::{Service, ServiceType};
+use crate::service::FetchRequest;
 
 /// The interface for the Factory+ Directory service.
 ///

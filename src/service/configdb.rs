@@ -7,10 +7,10 @@ use crate::error::FetchError;
 use crate::service::configdb::configdb_models::{ObjectRegistration, PrincipalConfig};
 use crate::service::directory::DirectoryInterface;
 use crate::service::discovery::DiscoveryInterface;
-use crate::service::FetchRequest;
-use crate::service::service_trait::{Service, ServiceType};
 use crate::service::service_trait::request::{HttpRequestMethod, ServiceOpts};
 use crate::service::service_trait::response::{FetchResponse, TokenStruct};
+use crate::service::service_trait::{Service, ServiceType};
+use crate::service::FetchRequest;
 use crate::uuids;
 
 pub struct ConfigDbInterface {

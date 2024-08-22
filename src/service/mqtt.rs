@@ -1,8 +1,8 @@
 //! This module provides an implementation of MQTTInterface for interacting with the Factory+
 //! MQTT service.
 
-use std::sync::Arc;
 use std::sync::mpsc;
+use std::sync::Arc;
 
 use paho_mqtt::ReasonCode;
 use sparkplug_rs;
