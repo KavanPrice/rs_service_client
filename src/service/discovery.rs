@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::error::FetchError;
 use crate::service::directory::DirectoryInterface;
-use crate::service::service_trait::ServiceType;
+use crate::service::ServiceType;
 
 /// The interface for the Factory+ Discovery service.
 ///

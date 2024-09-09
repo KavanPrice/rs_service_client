@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use crate::service::service_trait::ServiceType;
+use crate::service::ServiceType;
 
 pub struct AuthInterface {
     service_type: ServiceType,

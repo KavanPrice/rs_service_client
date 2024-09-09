@@ -10,7 +10,7 @@ use sparkplug_rs::protobuf::Message as ProtobufMessage;
 
 use crate::error::MqttError;
 use crate::service::mqtt::protocol::MqttProtocol;
-use crate::service::service_trait::ServiceType;
+use crate::service::ServiceType;
 
 /// The interface for the Factory+ MQTT service.
 pub struct MQTTInterface {

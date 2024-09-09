@@ -2,7 +2,7 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-use crate::service::service_trait::ServiceType;
+use crate::service::ServiceType;
 
 #[derive(Debug)]
 pub struct ServiceError {

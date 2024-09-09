@@ -7,11 +7,12 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::error::FetchError;
-use crate::service::{service_trait, utils};
+use crate::service;
 use crate::service::directory::service_provider::ServiceProvider;
-use crate::service::service_trait::request::{FetchOpts, HttpRequestMethod};
-use crate::service::service_trait::response::{FetchResponse, TokenStruct};
-use crate::service::service_trait::ServiceType;
+use crate::service::request::{FetchOpts, HttpRequestMethod};
+use crate::service::response::{FetchResponse, TokenStruct};
+use crate::service::ServiceType;
+use crate::service::utils;
 
 /// The interface for the Factory+ Directory service.
 ///
@@ -174,7 +175,7 @@ impl DirectoryInterface {
         if let Some(token) = locked_tokens.get(&ServiceType::Directory) {
             Ok(token.clone())
         } else {
-            let new_token = service_trait::fetch_util::get_new_token(
+            let new_token = service::fetch_util::get_new_token(
                 Arc::clone(&self.http_client),
                 self.service_url.clone(),
                 &self.service_username,
