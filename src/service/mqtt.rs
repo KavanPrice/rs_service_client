@@ -1,19 +1,16 @@
 //! This module provides an implementation of MQTTInterface for interacting with the Factory+
 //! MQTT service.
 
-use std::sync::mpsc;
 use std::sync::Arc;
+use std::sync::mpsc;
 
 use paho_mqtt::ReasonCode;
 use sparkplug_rs;
 use sparkplug_rs::protobuf::Message as ProtobufMessage;
 
 use crate::error::MqttError;
-use crate::service::directory::DirectoryInterface;
-use crate::service::discovery::DiscoveryInterface;
 use crate::service::mqtt::protocol::MqttProtocol;
-use crate::service::service_trait::{Service, ServiceType};
-use crate::uuids;
+use crate::service::service_trait::ServiceType;
 
 /// The interface for the Factory+ MQTT service.
 pub struct MQTTInterface {
@@ -21,6 +18,7 @@ pub struct MQTTInterface {
     service_username: String,
     service_password: String,
     http_client: Arc<reqwest::Client>,
+    pub service_url: String,
 }
 
 impl MQTTInterface {
@@ -28,14 +26,14 @@ impl MQTTInterface {
         service_username: String,
         service_password: String,
         http_client: Arc<reqwest::Client>,
+        service_url: String,
     ) -> Self {
         MQTTInterface {
-            service_type: ServiceType::MQTT {
-                uuid: uuids::service::MQTT,
-            },
+            service_type: ServiceType::MQTT,
             service_username,
             service_password,
             http_client,
+            service_url,
         }
     }
 
@@ -49,11 +47,8 @@ impl MQTTInterface {
     pub async fn get_mqtt_client(
         &self,
         protocol: MqttProtocol,
-        host_address: Option<String>,
         port: String,
         client_id: String,
-        discovery_interface: &DiscoveryInterface,
-        directory_interface: &DirectoryInterface,
     ) -> Result<
         (
             paho_mqtt::AsyncClient,
@@ -61,24 +56,7 @@ impl MQTTInterface {
         ),
         MqttError,
     > {
-        let host = match host_address {
-            Some(address) => address,
-            None => {
-                match discovery_interface
-                    .get_service_urls(uuids::service::MQTT, directory_interface)
-                    .await?
-                {
-                    Some(url_vec) => url_vec[0].clone(),
-                    None => {
-                        return Err(MqttError {
-                            message: String::from("No URL could be found"),
-                        })
-                    }
-                }
-            }
-        };
-
-        let full_uri = format!("{}://{}:{}", protocol.to_str(), host, port);
+        let full_uri = format!("{}://{}:{}", protocol.to_str(), self.service_url, port);
 
         match self
             .basic_async_client(
@@ -153,8 +131,6 @@ impl MQTTInterface {
         }
     }
 }
-
-impl Service for MQTTInterface {}
 
 pub mod protocol {
     //! Contains MqttProtocol and its implementations for describing the protocol to use with the

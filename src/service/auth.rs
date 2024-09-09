@@ -3,8 +3,7 @@
 
 use std::sync::Arc;
 
-use crate::service::service_trait::{Service, ServiceType};
-use crate::uuids;
+use crate::service::service_trait::ServiceType;
 
 pub struct AuthInterface {
     service_type: ServiceType,
@@ -12,6 +11,7 @@ pub struct AuthInterface {
     service_password: String,
     http_client: Arc<reqwest::Client>,
     directory_url: String,
+    pub service_url: String,
 }
 
 impl AuthInterface {
@@ -20,15 +20,15 @@ impl AuthInterface {
         service_password: String,
         http_client: Arc<reqwest::Client>,
         directory_url: String,
+        service_url: String,
     ) -> Self {
         AuthInterface {
-            service_type: ServiceType::Authentication {
-                uuid: uuids::service::AUTHENTICATION,
-            },
+            service_type: ServiceType::Authentication,
             service_username,
             service_password,
             http_client: Arc::clone(&http_client),
             directory_url,
+            service_url,
         }
     }
 
@@ -80,8 +80,6 @@ impl AuthInterface {
         todo!()
     }
 }
-
-impl Service for AuthInterface {}
 
 pub mod auth_models {
     //! Contains structs and implementations for modelling Auth requests and responses.

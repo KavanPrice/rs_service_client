@@ -5,15 +5,14 @@ use std::collections::HashMap;
 
 use crate::error::FetchError;
 use crate::service::directory::DirectoryInterface;
-use crate::service::service_trait::Service;
-use crate::uuids;
+use crate::service::service_trait::ServiceType;
 
 /// The interface for the Factory+ Discovery service.
 ///
 /// DiscoveryInterface holds a hashmap from service UUIDs to service URLs. These can be queried
 /// locally and can use the Directory service if not found locally.
 pub struct DiscoveryInterface {
-    pub urls: HashMap<uuid::Uuid, Vec<String>>,
+    pub urls: HashMap<ServiceType, Vec<String>>,
 }
 
 impl DiscoveryInterface {
@@ -36,22 +35,22 @@ impl DiscoveryInterface {
         directory_url: Option<String>,
         mqtt_url: Option<String>,
     ) -> Self {
-        let mut urls_map: HashMap<uuid::Uuid, Vec<String>> = HashMap::new();
+        let mut urls_map: HashMap<ServiceType, Vec<String>> = HashMap::new();
 
         // Closure to handle inserting the optional urls into urls_map.
         // This will insert a new vector if the key doesn't exist or push to the already existing
         // vector if it does.
-        let insert_maybe_url = |(service_uuid, maybe_service_url): (uuid::Uuid, Option<String>)| {
+        let insert_maybe_url = |(service, maybe_service_url): (ServiceType, Option<String>)| {
             if let Some(url) = maybe_service_url {
-                urls_map.entry(service_uuid).or_default().push(url);
+                urls_map.entry(service).or_default().push(url);
             }
         };
 
         vec![
-            (uuids::service::AUTHENTICATION, auth_url),
-            (uuids::service::CONFIG_DB, config_db_url),
-            (uuids::service::DIRECTORY, directory_url),
-            (uuids::service::MQTT, mqtt_url),
+            (ServiceType::Authentication, auth_url),
+            (ServiceType::ConfigDb, config_db_url),
+            (ServiceType::Directory, directory_url),
+            (ServiceType::MQTT, mqtt_url),
         ]
         .into_iter()
         .for_each(insert_maybe_url);
@@ -65,17 +64,17 @@ impl DiscoveryInterface {
     /// Otherwise None is returned.
     pub(crate) fn set_service_url(
         &mut self,
-        service_uuid: uuid::Uuid,
+        service: ServiceType,
         service_url: String,
     ) -> Option<Vec<String>> {
-        self.urls.insert(service_uuid, vec![service_url])
+        self.urls.insert(service, vec![service_url])
     }
 
     /// Inserts a (uuid, url) pair into the urls map. This adds to the current vector value assigned
     /// to the url key if the key already exists.
     /// This requires a mutable reference to the DiscoveryInterface.
-    pub(crate) fn add_service_url(&mut self, service_uuid: uuid::Uuid, service_url: String) {
-        self.urls.entry(service_uuid).or_default().push(service_url);
+    pub(crate) fn add_service_url(&mut self, service: ServiceType, service_url: String) {
+        self.urls.entry(service).or_default().push(service_url);
     }
 
     /// Gets all known URLS that point to a service with the given UUID.
@@ -83,25 +82,22 @@ impl DiscoveryInterface {
     /// is queried.
     pub async fn get_service_urls(
         &self,
-        service_uuid: uuid::Uuid,
+        service: ServiceType,
         directory_interface: &DirectoryInterface,
     ) -> Result<Option<Vec<String>>, FetchError> {
-        if let Some(url) = self.urls.get(&service_uuid).cloned() {
+        if let Some(url) = self.urls.get(&service).cloned() {
             Ok(Some(url))
         } else {
-            self.find_service_urls(service_uuid, directory_interface)
-                .await
+            self.find_service_urls(service, directory_interface).await
         }
     }
 
     /// Use the given Directory service to find the urls for the given service.
     pub async fn find_service_urls(
         &self,
-        service_uuid: uuid::Uuid,
+        service: ServiceType,
         directory_interface: &DirectoryInterface,
     ) -> Result<Option<Vec<String>>, FetchError> {
-        directory_interface.service_urls(service_uuid, self).await
+        directory_interface.service_urls(service).await
     }
 }
-
-impl Service for DiscoveryInterface {}
