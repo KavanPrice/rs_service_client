@@ -12,6 +12,7 @@ use tokio::sync::Mutex;
 
 use crate::error::FetchError;
 use crate::service::auth::AuthInterface;
+use crate::service::cmdesc::CmdEscInterface;
 use crate::service::configdb::ConfigDbInterface;
 use crate::service::directory::DirectoryInterface;
 use crate::service::mqtt::MQTTInterface;
@@ -20,6 +21,7 @@ use crate::service::response::{FetchResponse, PingResponse, TokenStruct};
 use crate::uuids;
 
 pub mod auth;
+mod cmdesc;
 pub mod configdb;
 pub mod directory;
 pub mod discovery;
@@ -38,6 +40,7 @@ pub struct ServiceClient {
     pub config_db_interface: ConfigDbInterface,
     pub directory_interface: DirectoryInterface,
     pub mqtt_interface: MQTTInterface,
+    pub cmd_esc_interface: CmdEscInterface,
 
     service_creds: ServiceCreds,
     pub root_principle: Option<String>,
@@ -54,6 +57,7 @@ impl ServiceClient {
         directory_url: &str,
     ) -> Self {
         let client = Arc::new(reqwest::Client::new());
+        let tokens = Arc::new(Mutex::new(HashMap::new()));
 
         let directory_interface = DirectoryInterface::from(
             String::from(service_username),
@@ -72,6 +76,10 @@ impl ServiceClient {
             .unwrap();
         let auth_urls = directory_interface
             .service_urls(ServiceType::Authentication)
+            .await
+            .unwrap();
+        let cmd_esc_urls = directory_interface
+            .service_urls(ServiceType::CommandEscalation)
             .await
             .unwrap();
 
@@ -98,8 +106,16 @@ impl ServiceClient {
             auth_urls.unwrap().first().unwrap().clone(),
         );
 
+        let cmd_esc_interface = CmdEscInterface::from(
+            String::from(service_username),
+            String::from(service_password),
+            Arc::clone(&client),
+            cmd_esc_urls.unwrap().first().unwrap().clone(),
+            Arc::clone(&tokens),
+        );
+
         ServiceClient {
-            tokens: Arc::new(Mutex::new(HashMap::new())),
+            tokens,
             http_client: Arc::clone(&client),
 
             service_creds: ServiceCreds::from(service_username, service_password),
@@ -110,6 +126,7 @@ impl ServiceClient {
             config_db_interface,
             directory_interface,
             mqtt_interface,
+            cmd_esc_interface,
         }
     }
 
@@ -124,6 +141,7 @@ impl ServiceClient {
             ServiceType::ConfigDb => self.config_db_interface.service_url.clone(),
             ServiceType::Authentication => self.auth_interface.service_url.clone(),
             ServiceType::MQTT => self.mqtt_interface.service_url.clone(),
+            ServiceType::CommandEscalation => self.cmd_esc_interface.service_url.clone(),
         };
 
         let ping_url = format!("{}/ping", service_url);
@@ -217,6 +235,7 @@ impl ServiceClient {
             ServiceType::ConfigDb => self.config_db_interface.service_url.clone(),
             ServiceType::Authentication => self.auth_interface.service_url.clone(),
             ServiceType::MQTT => self.mqtt_interface.service_url.clone(),
+            ServiceType::CommandEscalation => self.cmd_esc_interface.service_url.clone(),
         };
 
         let new_token = fetch_util::get_new_token(
@@ -249,6 +268,7 @@ impl ServiceClient {
                 ServiceType::ConfigDb => self.config_db_interface.service_url.clone(),
                 ServiceType::Authentication => self.auth_interface.service_url.clone(),
                 ServiceType::MQTT => self.mqtt_interface.service_url.clone(),
+                ServiceType::CommandEscalation => self.cmd_esc_interface.service_url.clone(),
             };
             let new_token =
                 fetch_util::get_new_token(client, service_url.clone(), username, password).await?;
@@ -332,6 +352,7 @@ pub enum ServiceType {
     ConfigDb,
     Authentication,
     MQTT,
+    CommandEscalation,
 }
 
 impl ServiceType {
@@ -341,6 +362,7 @@ impl ServiceType {
             ServiceType::ConfigDb => uuids::service::CONFIG_DB,
             ServiceType::Authentication => uuids::service::AUTHENTICATION,
             ServiceType::MQTT => uuids::service::MQTT,
+            ServiceType::CommandEscalation => uuids::service::COMMAND_ESCALATION,
         }
     }
 }
@@ -355,6 +377,7 @@ impl Display for ServiceType {
                 ServiceType::ConfigDb => "ConfigDb",
                 ServiceType::Authentication => "Authentication",
                 ServiceType::MQTT => "MQTT",
+                ServiceType::CommandEscalation => "CommandEscalation",
             },
             self.to_uuid()
         )

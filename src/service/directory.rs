@@ -11,8 +11,8 @@ use crate::service;
 use crate::service::directory::service_provider::ServiceProvider;
 use crate::service::request::{FetchOpts, HttpRequestMethod};
 use crate::service::response::{FetchResponse, TokenStruct};
-use crate::service::ServiceType;
 use crate::service::utils;
+use crate::service::ServiceType;
 
 /// The interface for the Factory+ Directory service.
 ///
