@@ -11,8 +11,8 @@ use crate::service;
 use crate::service::directory::service_provider::ServiceProvider;
 use crate::service::request::{FetchOpts, HttpRequestMethod};
 use crate::service::response::{FetchResponse, TokenStruct};
-use crate::service::utils;
 use crate::service::ServiceType;
+use crate::service::utils;
 
 /// The interface for the Factory+ Directory service.
 ///
@@ -33,6 +33,7 @@ impl DirectoryInterface {
         service_password: String,
         http_client: Arc<reqwest::Client>,
         service_url: String,
+        tokens: Arc<Mutex<HashMap<ServiceType, TokenStruct>>>,
     ) -> Self {
         DirectoryInterface {
             service_type: ServiceType::Directory,
@@ -40,7 +41,7 @@ impl DirectoryInterface {
             service_password,
             http_client,
             service_url,
-            tokens: Default::default(),
+            tokens,
         }
     }
 

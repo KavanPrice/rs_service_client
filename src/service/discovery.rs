@@ -2,9 +2,13 @@
 //! Discovery service.
 
 use std::collections::HashMap;
+use std::sync::Arc;
+
+use tokio::sync::Mutex;
 
 use crate::error::FetchError;
 use crate::service::directory::DirectoryInterface;
+use crate::service::response::TokenStruct;
 use crate::service::ServiceType;
 
 /// The interface for the Factory+ Discovery service.
@@ -13,14 +17,7 @@ use crate::service::ServiceType;
 /// locally and can use the Directory service if not found locally.
 pub struct DiscoveryInterface {
     pub urls: HashMap<ServiceType, Vec<String>>,
-}
-
-impl DiscoveryInterface {
-    pub fn new() -> Self {
-        DiscoveryInterface {
-            urls: HashMap::new(),
-        }
-    }
+    tokens: Arc<Mutex<HashMap<ServiceType, TokenStruct>>>,
 }
 
 impl DiscoveryInterface {
@@ -34,6 +31,8 @@ impl DiscoveryInterface {
         config_db_url: Option<String>,
         directory_url: Option<String>,
         mqtt_url: Option<String>,
+        cmd_esc_url: Option<String>,
+        tokens: Arc<Mutex<HashMap<ServiceType, TokenStruct>>>,
     ) -> Self {
         let mut urls_map: HashMap<ServiceType, Vec<String>> = HashMap::new();
 
@@ -51,17 +50,21 @@ impl DiscoveryInterface {
             (ServiceType::ConfigDb, config_db_url),
             (ServiceType::Directory, directory_url),
             (ServiceType::MQTT, mqtt_url),
+            (ServiceType::CommandEscalation, cmd_esc_url),
         ]
         .into_iter()
         .for_each(insert_maybe_url);
-        DiscoveryInterface { urls: urls_map }
+        DiscoveryInterface {
+            urls: urls_map,
+            tokens,
+        }
     }
 
     /// Inserts a (uuid, url) pair into the urls map. This overwrites the current vector or urls.
     /// This requires a mutable reference to the DiscoveryInterface.
     ///
     /// If the key was already present in the map, the old value is returned.
-    /// Otherwise None is returned.
+    /// Otherwise, None is returned.
     pub(crate) fn set_service_url(
         &mut self,
         service: ServiceType,

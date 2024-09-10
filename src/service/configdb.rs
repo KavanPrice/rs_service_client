@@ -9,8 +9,8 @@ use crate::service;
 use crate::service::configdb::configdb_models::{ObjectRegistration, PrincipalConfig};
 use crate::service::request::{FetchOpts, HttpRequestMethod};
 use crate::service::response::{FetchResponse, TokenStruct};
-use crate::service::utils;
 use crate::service::ServiceType;
+use crate::service::utils;
 
 pub struct ConfigDbInterface {
     service_type: ServiceType,
@@ -18,8 +18,8 @@ pub struct ConfigDbInterface {
     service_password: String,
     http_client: Arc<reqwest::Client>,
     directory_url: String,
-    tokens: Arc<Mutex<HashMap<ServiceType, TokenStruct>>>,
     pub service_url: String,
+    tokens: Arc<Mutex<HashMap<ServiceType, TokenStruct>>>,
 }
 
 impl ConfigDbInterface {
@@ -29,6 +29,7 @@ impl ConfigDbInterface {
         http_client: Arc<reqwest::Client>,
         directory_url: String,
         service_url: String,
+        tokens: Arc<Mutex<HashMap<ServiceType, TokenStruct>>>,
     ) -> Self {
         ConfigDbInterface {
             service_type: ServiceType::ConfigDb,
@@ -36,8 +37,8 @@ impl ConfigDbInterface {
             service_password,
             http_client: Arc::clone(&http_client),
             directory_url,
-            tokens: Default::default(),
             service_url,
+            tokens,
         }
     }
 

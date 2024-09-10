@@ -64,6 +64,7 @@ impl ServiceClient {
             String::from(service_password),
             Arc::clone(&client),
             String::from(directory_url),
+            Arc::clone(&tokens),
         );
 
         let configdb_urls = directory_interface
@@ -89,6 +90,7 @@ impl ServiceClient {
             Arc::clone(&client),
             String::from(directory_url),
             configdb_urls.unwrap().first().unwrap().clone(),
+            Arc::clone(&tokens),
         );
 
         let mqtt_interface = MQTTInterface::from(
@@ -96,6 +98,7 @@ impl ServiceClient {
             String::from(service_password),
             Arc::clone(&client),
             mqtt_urls.unwrap().first().unwrap().clone(),
+            Arc::clone(&tokens),
         );
 
         let auth_interface = AuthInterface::from(
@@ -104,6 +107,7 @@ impl ServiceClient {
             Arc::clone(&client),
             String::from(directory_url),
             auth_urls.unwrap().first().unwrap().clone(),
+            Arc::clone(&tokens),
         );
 
         let cmd_esc_interface = CmdEscInterface::from(

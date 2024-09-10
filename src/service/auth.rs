@@ -1,8 +1,12 @@
 //! This module provides an implementation of AuthInterface for interacting with the Factory+
 //! Auth service.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
+use tokio::sync::Mutex;
+
+use crate::service::response::TokenStruct;
 use crate::service::ServiceType;
 
 pub struct AuthInterface {
@@ -12,6 +16,7 @@ pub struct AuthInterface {
     http_client: Arc<reqwest::Client>,
     directory_url: String,
     pub service_url: String,
+    tokens: Arc<Mutex<HashMap<ServiceType, TokenStruct>>>,
 }
 
 impl AuthInterface {
@@ -21,6 +26,7 @@ impl AuthInterface {
         http_client: Arc<reqwest::Client>,
         directory_url: String,
         service_url: String,
+        tokens: Arc<Mutex<HashMap<ServiceType, TokenStruct>>>,
     ) -> Self {
         AuthInterface {
             service_type: ServiceType::Authentication,
@@ -29,6 +35,7 @@ impl AuthInterface {
             http_client: Arc::clone(&http_client),
             directory_url,
             service_url,
+            tokens,
         }
     }
 

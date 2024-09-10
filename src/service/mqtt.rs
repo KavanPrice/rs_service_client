@@ -1,15 +1,18 @@
 //! This module provides an implementation of MQTTInterface for interacting with the Factory+
 //! MQTT service.
 
-use std::sync::mpsc;
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::mpsc;
 
 use paho_mqtt::ReasonCode;
 use sparkplug_rs;
 use sparkplug_rs::protobuf::Message as ProtobufMessage;
+use tokio::sync::Mutex;
 
 use crate::error::MqttError;
 use crate::service::mqtt::protocol::MqttProtocol;
+use crate::service::response::TokenStruct;
 use crate::service::ServiceType;
 
 /// The interface for the Factory+ MQTT service.
@@ -19,6 +22,7 @@ pub struct MQTTInterface {
     service_password: String,
     http_client: Arc<reqwest::Client>,
     pub service_url: String,
+    tokens: Arc<Mutex<HashMap<ServiceType, TokenStruct>>>,
 }
 
 impl MQTTInterface {
@@ -27,6 +31,7 @@ impl MQTTInterface {
         service_password: String,
         http_client: Arc<reqwest::Client>,
         service_url: String,
+        tokens: Arc<Mutex<HashMap<ServiceType, TokenStruct>>>,
     ) -> Self {
         MQTTInterface {
             service_type: ServiceType::MQTT,
@@ -34,6 +39,7 @@ impl MQTTInterface {
             service_password,
             http_client,
             service_url,
+            tokens,
         }
     }
 
