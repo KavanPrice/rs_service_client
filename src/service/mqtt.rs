@@ -4,6 +4,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::mpsc;
+use std::time::Duration;
 
 use paho_mqtt::ReasonCode;
 use sparkplug_rs;
@@ -47,14 +48,11 @@ impl MQTTInterface {
     /// passed components. If this is successful, the client will be returned along with the
     /// receiving half of mpsc::channel for receiving the deserialised Sparkplug payloads. These are
     /// deserialised as sparkplug_rs::Payload structs by the client message callback.
-    ///
-    /// If a None host address is given, the Discovery and Directory services will be used to obtain
-    /// an address. If one is not found, an error will be returned.
     pub async fn get_mqtt_client(
         &self,
         protocol: MqttProtocol,
-        port: String,
-        client_id: String,
+        port: u16,
+        client_id: &str,
     ) -> Result<
         (
             paho_mqtt::AsyncClient,
@@ -62,11 +60,9 @@ impl MQTTInterface {
         ),
         MqttError,
     > {
-        let full_uri = format!("{}://{}:{}", protocol.to_str(), self.service_url, port);
-
         match self
             .basic_async_client(
-                full_uri,
+                format!("{}:{}", &self.service_url, port),
                 client_id,
                 self.service_username.clone(),
                 self.service_password.clone(),
@@ -86,7 +82,7 @@ impl MQTTInterface {
     async fn basic_async_client(
         &self,
         uri: String,
-        client_id: String,
+        client_id: &str,
         username: String,
         password: String,
     ) -> Result<
@@ -101,10 +97,17 @@ impl MQTTInterface {
             .client_id(client_id)
             .create_client()?;
 
-        let connect_options = paho_mqtt::ConnectOptionsBuilder::new_v5()
+        let ssl_options = paho_mqtt::SslOptionsBuilder::new()
+            .enable_server_cert_auth(false)
+            .finalize();
+
+        let connect_options = paho_mqtt::ConnectOptionsBuilder::new()
             .user_name(username)
             .password(password)
             .clean_start(true)
+            .clean_session(true)
+            .keep_alive_interval(Duration::from_secs(20))
+            .ssl_options(ssl_options)
             .finalize();
 
         let (sender, receiver) = mpsc::channel::<sparkplug_rs::Payload>();
@@ -141,9 +144,15 @@ impl MQTTInterface {
 pub mod protocol {
     //! Contains MqttProtocol and its implementations for describing the protocol to use with the
     //! MQTT service.
+
+    use std::str::FromStr;
+
+    use crate::error::MqttError;
+
     pub enum MqttProtocol {
         TCP,
         SSL,
+        TLS,
     }
 
     impl MqttProtocol {
@@ -151,16 +160,25 @@ pub mod protocol {
             match &self {
                 MqttProtocol::TCP => "tcp",
                 MqttProtocol::SSL => "ssl",
+                MqttProtocol::TLS => "mqtts",
             }
         }
+    }
 
-        pub fn from_str(str: &str) -> Option<Self> {
-            match str {
-                "tcp" => Some(MqttProtocol::TCP),
-                "TCP" => Some(MqttProtocol::TCP),
-                "ssl" => Some(MqttProtocol::SSL),
-                "SSL" => Some(MqttProtocol::SSL),
-                _ => None,
+    impl FromStr for MqttProtocol {
+        type Err = MqttError;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "tcp" => Ok(MqttProtocol::TCP),
+                "TCP" => Ok(MqttProtocol::TCP),
+                "ssl" => Ok(MqttProtocol::SSL),
+                "SSL" => Ok(MqttProtocol::SSL),
+                "mqtts" => Ok(MqttProtocol::TLS),
+                "MQTTS" => Ok(MqttProtocol::TLS),
+                _ => Err(MqttError {
+                    message: String::from("Couldn't determine protocol."),
+                }),
             }
         }
     }
