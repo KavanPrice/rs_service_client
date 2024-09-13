@@ -91,7 +91,7 @@ impl AuthInterface {
 pub mod auth_models {
     //! Contains structs and implementations for modelling Auth requests and responses.
 
-    use crate::sparkplug::util::Address;
+    use crate::sparkplug::util::address::Address;
 
     pub struct PostAceBody {
         pub permission: uuid::Uuid,

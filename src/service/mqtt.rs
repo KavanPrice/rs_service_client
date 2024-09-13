@@ -2,8 +2,8 @@
 //! MQTT service.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::time::Duration;
 
 use paho_mqtt::ReasonCode;

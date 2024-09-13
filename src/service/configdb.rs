@@ -9,8 +9,8 @@ use crate::service;
 use crate::service::configdb::configdb_models::{ObjectRegistration, PrincipalConfig};
 use crate::service::request::{FetchOpts, HttpRequestMethod};
 use crate::service::response::{FetchResponse, TokenStruct};
-use crate::service::ServiceType;
 use crate::service::utils;
+use crate::service::ServiceType;
 
 pub struct ConfigDbInterface {
     service_type: ServiceType,

@@ -1,15 +1,18 @@
 //! This module provides an implementation of CmdEscInterface for interacting with the Factory+
 //! Command Escalation service.
 
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
+use std::sync::Arc;
+
+use tokio::sync::Mutex;
+
 use crate::error::FetchError;
 use crate::service;
 use crate::service::request::{FetchOpts, HttpRequestMethod};
 use crate::service::response::{FetchResponse, TokenStruct};
 use crate::service::{utils, ServiceType};
-use crate::sparkplug::util::Address;
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use crate::sparkplug::util::address::Address;
 
 /// The interface for the Factory+ Command Escalation service.
 pub struct CmdEscInterface {
@@ -49,16 +52,14 @@ impl CmdEscInterface {
         value: CmdValue,
     ) -> Result<FetchResponse, FetchError> {
         let fetch_opts = FetchOpts {
-            url: format!("{}/v1/address/{}", self.service_url, address.to_string()),
+            url: format!("{}/v1/address/{}", self.service_url, address),
             service: ServiceType::CommandEscalation,
             method: HttpRequestMethod::POST,
             headers: Default::default(),
             query: None,
             body: Some(format!(
                 r#"{{"name":"{}","type":"{}","value":{}}}"#,
-                name,
-                r#type,
-                value.to_string()
+                name, r#type, value
             )),
         };
 
@@ -165,11 +166,11 @@ pub enum CmdValue {
     Bool(bool),
 }
 
-impl CmdValue {
-    fn to_string(&self) -> String {
+impl Display for CmdValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            CmdValue::String(value) => format!(r#""{}""#, value),
-            CmdValue::Bool(value) => format!(r#"{}"#, value.to_string()),
+            CmdValue::String(value) => write!(f, r#""{}""#, value),
+            CmdValue::Bool(value) => write!(f, r#"{}"#, value),
         }
     }
 }

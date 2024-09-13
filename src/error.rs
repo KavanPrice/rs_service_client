@@ -61,3 +61,16 @@ impl From<FetchError> for MqttError {
 }
 
 impl Error for MqttError {}
+
+#[derive(Debug)]
+pub struct SparkplugError {
+    pub message: String,
+}
+
+impl Display for SparkplugError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl Error for SparkplugError {}

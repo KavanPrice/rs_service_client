@@ -449,6 +449,7 @@ pub mod response {
     //! Contains response representations and implementations.
     use serde::Deserialize;
 
+    #[derive(Debug)]
     pub struct FetchResponse {
         pub status: http::StatusCode,
         pub content: String,
