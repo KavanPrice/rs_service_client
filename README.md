@@ -7,10 +7,10 @@ applications.
 
 ## Installation and Usage
 
-- Point your `cargo.toml` at this repo:
+- Add this crate to your `cargo.toml`:
 
-```toml
-rs_service_client = { git = "https://github.com/KavanPrice/rs_service_client" }
+```bash
+cargo add rs_service_client
 ```
 
 - Import the `ServiceClient`:
