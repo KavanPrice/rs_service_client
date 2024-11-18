@@ -2,6 +2,7 @@
 //! MQTT service.
 
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,6 +16,7 @@ use crate::error::MqttError;
 use crate::service::mqtt::protocol::MqttProtocol;
 use crate::service::response::TokenStruct;
 use crate::service::ServiceType;
+use crate::sparkplug::util::topic::Topic;
 
 /// The interface for the Factory+ MQTT service.
 pub struct MQTTInterface {
@@ -56,7 +58,7 @@ impl MQTTInterface {
     ) -> Result<
         (
             paho_mqtt::AsyncClient,
-            mpsc::Receiver<sparkplug_rs::Payload>,
+            mpsc::Receiver<(Topic, sparkplug_rs::Payload)>,
         ),
         MqttError,
     > {
@@ -88,7 +90,7 @@ impl MQTTInterface {
     ) -> Result<
         (
             paho_mqtt::AsyncClient,
-            mpsc::Receiver<sparkplug_rs::Payload>,
+            mpsc::Receiver<(Topic, sparkplug_rs::Payload)>,
         ),
         paho_mqtt::Error,
     > {
@@ -110,20 +112,21 @@ impl MQTTInterface {
             .ssl_options(ssl_options)
             .finalize();
 
-        let (sender, receiver) = mpsc::channel::<sparkplug_rs::Payload>();
+        let (sender, receiver) = mpsc::channel::<(Topic, sparkplug_rs::Payload)>();
 
         client.set_message_callback(move |_client, maybe_message: Option<paho_mqtt::Message>| {
             if let Some(message) = maybe_message {
-                match sparkplug_rs::Payload::parse_from_bytes(message.payload()) {
-                    Ok(payload) => {
-                        if let Err(returned_payload) = sender.send(payload) {
-                            eprintln!(
-                                "Failed to send payload through channel: {}",
-                                returned_payload
-                            )
+                match (
+                    Topic::from_str(message.topic()),
+                    sparkplug_rs::Payload::parse_from_bytes(message.payload()),
+                ) {
+                    (Ok(topic), Ok(payload)) => {
+                        if let Err(returned_pair) = sender.send((topic, payload)) {
+                            eprintln!("Failed to send pair through channel: {}", returned_pair)
                         }
                     }
-                    Err(e) => eprintln!("Failed to parse payload: {}", e),
+                    (_, Err(e)) => eprintln!("Failed to parse payload: {}", e),
+                    (Err(e), _) => eprintln!("Failed to parse topic: {}", e),
                 }
             }
         });

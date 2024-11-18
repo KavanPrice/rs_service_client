@@ -52,8 +52,8 @@ async fn main() {
 
     let mut message_iterator = receiver.iter();
     loop {
-        if let Some(message) = message_iterator.next() {
-            println!("{}", message);
+        if let Some((topic, payload)) = message_iterator.next() {
+            println!("{}", payload);
         }
     }
 }
